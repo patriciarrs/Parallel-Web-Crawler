@@ -19,8 +19,8 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 public final class WebCrawlerMain {
-
     private final CrawlerConfiguration config;
+
     @Inject
     private WebCrawler crawler;
     @Inject
@@ -37,6 +37,7 @@ public final class WebCrawlerMain {
         }
 
         CrawlerConfiguration config = new ConfigurationLoader(Path.of(args[0])).load();
+
         new WebCrawlerMain(config).run();
     }
 
