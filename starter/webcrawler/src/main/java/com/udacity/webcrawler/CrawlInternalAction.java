@@ -1,7 +1,6 @@
 package com.udacity.webcrawler;
 
-import com.udacity.webcrawler.parser.PageParser;
-import com.udacity.webcrawler.parser.PageParserFactory;
+import com.udacity.webcrawler.parser.PageParser.Result;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -12,72 +11,50 @@ import java.util.concurrent.RecursiveAction;
 import java.util.regex.Pattern;
 
 public class CrawlInternalAction extends RecursiveAction {
-    private final Clock clock;
-    private final PageParserFactory parserFactory;
+    private final CrawlInternalActionFactory crawlInternalActionFactory;
     private final int maxDepth;
-    private final List<Pattern> ignoredUrls;
-    private final Instant deadline;
     private final String url;
-    private final Set<String> visitedUrls;
-    private final Map<String, Integer> counts;
 
-    public CrawlInternalAction(Clock clock,
-                               PageParserFactory parserFactory,
-                               @MaxDepth int maxDepth,
-                               @IgnoredUrls List<Pattern> ignoredUrls,
-                               Instant deadline,
-                               String url,
-                               Set<String> visitedUrls,
-                               Map<String, Integer> counts) {
-        this.clock = clock;
-        this.parserFactory = parserFactory;
+    public CrawlInternalAction(CrawlInternalActionFactory crawlInternalActionFactory, String url, int maxDepth) {
+        this.crawlInternalActionFactory = crawlInternalActionFactory;
         this.maxDepth = maxDepth;
-        this.ignoredUrls = ignoredUrls;
-        this.deadline = deadline;
         this.url = url;
-        this.visitedUrls = visitedUrls;
-        this.counts = counts;
     }
 
     @Override
     protected void compute() {
+        Clock clock = crawlInternalActionFactory.getClock();
+        Instant deadline = crawlInternalActionFactory.getDeadline();
+
         if (maxDepth == 0 || clock.instant().isAfter(deadline)) {
             return;
         }
 
+        List<Pattern> ignoredUrls = crawlInternalActionFactory.getIgnoredUrls();
         for (Pattern pattern : ignoredUrls) {
             if (pattern.matcher(url).matches()) {
                 return;
             }
         }
 
-        if (visitedUrls.contains(url)) {
+        Set<String> visitedUrls = crawlInternalActionFactory.getVisitedUrls();
+        if (!visitedUrls.add(url)) {
             return;
         }
 
-        visitedUrls.add(url);
+        Result result = crawlInternalActionFactory.getParserFactory().get(url).parse();
+        Set<Map.Entry<String, Integer>> entries = result.getWordCounts().entrySet();
 
-        PageParser.Result result = parserFactory.get(url).parse();
+        for (Map.Entry<String, Integer> e : entries) {
+            Map<String, Integer> counts = crawlInternalActionFactory.getCounts();
 
-        for (Map.Entry<String, Integer> e : result.getWordCounts().entrySet()) {
-            if (counts.containsKey(e.getKey())) {
-                counts.put(e.getKey(), e.getValue() + counts.get(e.getKey()));
-            } else {
-                counts.put(e.getKey(), e.getValue());
-            }
+            counts.compute(e.getKey(), (k, v) -> (v == null) ? e.getValue() : v + e.getValue());
         }
 
         List<String> subLinks = result.getLinks();
 
         List<CrawlInternalAction> subtasks = subLinks.stream()
-                .map(link -> new CrawlInternalAction(clock,
-                        parserFactory,
-                        maxDepth - 1,
-                        ignoredUrls,
-                        deadline,
-                        link,
-                        visitedUrls,
-                        counts)).toList();
+                .map(link -> crawlInternalActionFactory.create(link, maxDepth - 1)).toList();
 
         invokeAll(subtasks);
     }

@@ -1,18 +1,17 @@
 package com.udacity.webcrawler;
 
 import com.udacity.webcrawler.json.CrawlResult;
-import com.udacity.webcrawler.parser.PageParser;
 import com.udacity.webcrawler.parser.PageParserFactory;
 
 import javax.inject.Inject;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.regex.Pattern;
 
@@ -51,16 +50,17 @@ final class ParallelWebCrawler implements WebCrawler {
     @Override
     public CrawlResult crawl(List<String> startingUrls) {
         Instant deadline = clock.instant().plus(timeout);
+        Set<String> visitedUrls = ConcurrentHashMap.newKeySet();
+        // Word -> Count
+        Map<String, Integer> counts = new ConcurrentHashMap<>();
 
-        Map<String, Integer> counts = new HashMap<>();
-
-        Set<String> visitedUrls = new HashSet<>();
+        // Holds shared state
+        CrawlInternalActionFactory crawlInternalActionFactory =
+                new CrawlInternalActionFactory(clock, parserFactory, ignoredUrls, deadline, visitedUrls, counts);
 
         for (String url : startingUrls) {
-            CrawlInternalAction crawlInternalAction =
-                    new CrawlInternalAction(clock, parserFactory, maxDepth, ignoredUrls, deadline, url, visitedUrls,
-                            counts);
-            
+            CrawlInternalAction crawlInternalAction = crawlInternalActionFactory.create(url, maxDepth);
+
             pool.invoke(crawlInternalAction);
         }
 
