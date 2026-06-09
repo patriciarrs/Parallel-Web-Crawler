@@ -1,6 +1,5 @@
 package com.udacity.webcrawler.json;
 
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedWriter;
@@ -8,6 +7,10 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+
+import static com.fasterxml.jackson.core.JsonGenerator.Feature.AUTO_CLOSE_TARGET;
+import static java.nio.file.StandardOpenOption.APPEND;
+import static java.nio.file.StandardOpenOption.CREATE;
 
 /**
  * Utility class to write a {@link CrawlResult} to file.
@@ -31,7 +34,7 @@ public final class CrawlResultWriter {
      * @param path the file path where the crawl result data should be written.
      */
     public void write(Path path) throws Exception {
-        try (BufferedWriter writer = Files.newBufferedWriter(path)) {
+        try (BufferedWriter writer = Files.newBufferedWriter(path, CREATE, APPEND)) {
             write(writer);
         }
     }
@@ -45,7 +48,7 @@ public final class CrawlResultWriter {
         ObjectMapper objectMapper = new ObjectMapper();
 
         // This prevents the Jackson library from closing the Writer (which is closed in CrawlResultWriter.write(path)).
-        objectMapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+        objectMapper.disable(AUTO_CLOSE_TARGET);
 
         objectMapper.writeValue(writer, result);
     }

@@ -121,12 +121,12 @@
                         </property>
                     </systemProperties>
                 </configuration>
-                <version>3.0.0-M5</version>
+                <version>3.0.0-M7</version>
                 <dependencies>
                     <dependency>
                         <groupId>org.junit.jupiter</groupId>
                         <artifactId>junit-jupiter-engine</artifactId>
-                        <version>5.3.2</version>
+                        <version>5.8.2</version>
                     </dependency>
                 </dependencies>
             </plugin>
