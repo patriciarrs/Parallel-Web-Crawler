@@ -1,6 +1,7 @@
 package com.udacity.webcrawler.profiler;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -13,8 +14,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * Helper class that records method performance data from the method interceptor.
  */
 final class ProfilingState {
-    private final Map<String, Duration> data = new ConcurrentHashMap<>();
-    private final Map<String, Long> callCounts = new ConcurrentHashMap<>();
+    // Aggregated totals keyed by "ClassName#method" — for the summary line
+    private final Map<String, Duration> totalData = new ConcurrentHashMap<>();
+    private final Map<String, Long> totalCallCounts = new ConcurrentHashMap<>();
+
+    // Per-thread breakdown keyed by "ClassName#method [thread=N]" — for the detail lines
+    private final Map<String, Duration> threadData = new ConcurrentHashMap<>();
+    private final Map<String, Long> threadCallCounts = new ConcurrentHashMap<>();
 
     /**
      * Records the given method invocation data.
@@ -31,10 +37,17 @@ final class ProfilingState {
         if (elapsed.isNegative()) {
             throw new IllegalArgumentException("negative elapsed time");
         }
-        String key = formatMethodCall(callingClass, method) + " [thread=" + threadId + "]";
-        data.compute(key, (k, v) -> (v == null) ? elapsed : v.plus(elapsed));
 
-        callCounts.merge(key, 1L, Long::sum);
+        String methodKey = formatMethodCall(callingClass, method);
+        String threadKey = methodKey + " [thread=" + threadId + "]";
+
+        // Update aggregated totals
+        totalData.merge(methodKey, elapsed, Duration::plus);
+        totalCallCounts.merge(methodKey, 1L, Long::sum);
+
+        // Update per-thread breakdown
+        threadData.merge(threadKey, elapsed, Duration::plus);
+        threadCallCounts.merge(threadKey, 1L, Long::sum);
     }
 
     /**
@@ -46,19 +59,29 @@ final class ProfilingState {
      * this {@code write()} method for {@code M()} should be 3 seconds.
      */
     void write(Writer writer) throws IOException {
-        List<String> entries =
-                data.entrySet()
-                        .stream()
-                        .sorted(Map.Entry.comparingByKey())
-                        .map(e -> e.getKey() + " took " + formatDuration(e.getValue())
-                                + " over " + callCounts.getOrDefault(e.getKey(), 0L) + " call(s)"
-                                + System.lineSeparator())
-                        .toList();
+        // Get all unique method keys (without thread suffix)
+        List<String> methodKeys = totalData.keySet().stream().sorted().toList();
 
-        // We have to use a for-loop here instead of a Stream API method because Writer#write() can
-        // throw an IOException, and lambdas are not allowed to throw checked exceptions.
-        for (String entry : entries) {
-            writer.write(entry);
+        for (String methodKey : methodKeys) {
+            // Write the aggregated summary line
+            Duration total = totalData.get(methodKey);
+            long calls = totalCallCounts.getOrDefault(methodKey, 0L);
+            writer.write(String.format("%s took %s over %d call(s) (all threads)%n",
+                    methodKey, formatDuration(total), calls));
+
+            // Write per-thread breakdown, indented
+            threadData.entrySet().stream()
+                    .filter(e -> e.getKey().startsWith(methodKey + " [thread="))
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(e -> {
+                        try {
+                            long threadCalls = threadCallCounts.getOrDefault(e.getKey(), 0L);
+                            writer.write(String.format("    %s took %s over %d call(s)%n",
+                                    e.getKey(), formatDuration(e.getValue()), threadCalls));
+                        } catch (IOException ex) {
+                            throw new UncheckedIOException(ex);
+                        }
+                    });
         }
     }
 
