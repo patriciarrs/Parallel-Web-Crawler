@@ -50,7 +50,8 @@ final class ProfilingMethodInterceptor implements InvocationHandler {
         } catch (InvocationTargetException e) {
             throw e.getCause();  // rethrow the real exception, not the wrapper
         } finally {
-            profilingState.record(delegate.getClass(), method, Duration.between(start, clock.instant()));
+            long threadId = Thread.currentThread().getId();
+            profilingState.record(delegate.getClass(), method, Duration.between(start, clock.instant()), threadId);
         }
     }
 }
