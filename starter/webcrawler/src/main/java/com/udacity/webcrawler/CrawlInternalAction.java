@@ -23,30 +23,30 @@ public class CrawlInternalAction extends RecursiveAction {
 
     @Override
     protected void compute() {
-        Clock clock = crawlInternalActionFactory.getClock();
-        Instant deadline = crawlInternalActionFactory.getDeadline();
+        Clock clock = crawlInternalActionFactory.clock();
+        Instant deadline = crawlInternalActionFactory.deadline();
 
         if (maxDepth == 0 || clock.instant().isAfter(deadline)) {
             return;
         }
 
-        List<Pattern> ignoredUrls = crawlInternalActionFactory.getIgnoredUrls();
+        List<Pattern> ignoredUrls = crawlInternalActionFactory.ignoredUrls();
         for (Pattern pattern : ignoredUrls) {
             if (pattern.matcher(url).matches()) {
                 return;
             }
         }
 
-        Set<String> visitedUrls = crawlInternalActionFactory.getVisitedUrls();
+        Set<String> visitedUrls = crawlInternalActionFactory.visitedUrls();
         if (!visitedUrls.add(url)) {
             return;
         }
 
-        Result result = crawlInternalActionFactory.getParserFactory().get(url).parse();
+        Result result = crawlInternalActionFactory.parserFactory().get(url).parse();
         Set<Map.Entry<String, Integer>> entries = result.getWordCounts().entrySet();
 
         for (Map.Entry<String, Integer> e : entries) {
-            Map<String, Integer> counts = crawlInternalActionFactory.getCounts();
+            Map<String, Integer> counts = crawlInternalActionFactory.counts();
 
             counts.compute(e.getKey(), (k, v) -> (v == null) ? e.getValue() : v + e.getValue());
         }
