@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 import java.util.regex.Pattern;
 
 /**
@@ -57,11 +58,16 @@ final class ParallelWebCrawler implements WebCrawler {
         CrawlInternalActionFactory crawlInternalActionFactory =
                 new CrawlInternalActionFactory(clock, parserFactory, ignoredUrls, deadline, visitedUrls, counts);
 
-        for (String url : startingUrls) {
-            CrawlInternalAction crawlInternalAction = crawlInternalActionFactory.create(url, maxDepth);
-
-            pool.invoke(crawlInternalAction);
-        }
+        List<CrawlInternalAction> rootTasks = startingUrls.stream()
+                .map(url -> crawlInternalActionFactory.create(url, maxDepth))
+                .toList();
+        
+        pool.invoke(new RecursiveAction() {
+            @Override
+            protected void compute() {
+                invokeAll(rootTasks);
+            }
+        });
 
         if (counts.isEmpty()) {
             return new CrawlResult.Builder()
