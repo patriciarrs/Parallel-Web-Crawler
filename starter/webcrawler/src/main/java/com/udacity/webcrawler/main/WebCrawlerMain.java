@@ -54,7 +54,6 @@ public final class WebCrawlerMain {
             // OutputStreamWriter converts an OutputStream (like System.out that is a PrintStream) into a Writer
             Writer writer = new OutputStreamWriter(System.out, StandardCharsets.UTF_8);
             resultWriter.write(writer);
-            writer.close();
         } else {
             // Write the crawl results to a JSON file
             Path path = Path.of(resultOutputPath);
@@ -65,7 +64,6 @@ public final class WebCrawlerMain {
         if (config.getProfileOutputPath().isEmpty()) {
             Writer writer = new OutputStreamWriter(System.out, StandardCharsets.UTF_8);
             profiler.writeData(writer);
-            writer.close();
         } else {
             profiler.writeData(Path.of(config.getProfileOutputPath()));
         }

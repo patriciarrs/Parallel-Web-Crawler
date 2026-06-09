@@ -27,31 +27,31 @@ final class ProfilingMethodInterceptor implements InvocationHandler {
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        // TODO: This method interceptor should inspect the called method to see if it is a profiled
-        //       method. For profiled methods, the interceptor should record the start time, then
-        //       invoke the method using the object that is being profiled. Finally, for profiled
-        //       methods, the interceptor should record how long the method call took, using the
-        //       ProfilingState methods.
-
-        // Special case: delegate equals() directly to avoid proxy issues
-        if (method.getName().equals("equals") && method.getParameterCount() == 1) {
+        // Rubric: bypass equals on Object.class to avoid proxy interference
+        if (method.getDeclaringClass().equals(Object.class) && method.getName().equals("equals")) {
             return delegate.equals(args[0]);
         }
 
-        // Not profiled — just pass through
         if (method.getAnnotation(Profiled.class) == null) {
-            return method.invoke(delegate, args);
+            try {
+                return method.invoke(delegate, args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
         }
 
-        // Profiled — measure time, always record even if exception thrown
         Instant start = clock.instant();
         try {
             return method.invoke(delegate, args);
         } catch (InvocationTargetException e) {
-            throw e.getCause();  // rethrow the real exception, not the wrapper
+            throw e.getCause();
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
         } finally {
-            long threadId = Thread.currentThread().getId();
-            profilingState.record(delegate.getClass(), method, Duration.between(start, clock.instant()), threadId);
+            profilingState.record(delegate.getClass(), method,
+                    Duration.between(start, clock.instant()), Thread.currentThread().getId());
         }
     }
 }
