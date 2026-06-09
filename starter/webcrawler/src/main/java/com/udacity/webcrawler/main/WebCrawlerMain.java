@@ -11,7 +11,6 @@ import com.udacity.webcrawler.profiler.Profiler;
 import com.udacity.webcrawler.profiler.ProfilerModule;
 
 import javax.inject.Inject;
-import java.io.BufferedWriter;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
@@ -63,5 +62,12 @@ public final class WebCrawlerMain {
         }
 
         // TODO: Write the profile data to a text file (or System.out if the file name is empty)
+        if (config.getProfileOutputPath().isEmpty()) {
+            Writer writer = new OutputStreamWriter(System.out, StandardCharsets.UTF_8);
+            profiler.writeData(writer);
+            writer.close();
+        } else {
+            profiler.writeData(Path.of(config.getProfileOutputPath()));
+        }
     }
 }
